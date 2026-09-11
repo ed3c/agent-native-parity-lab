@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "reference_id": "kotlin-auto-webview-play-safe",
+  "source": {
+    "repository": "ed3c/kotlin-auto-webview",
+    "repository_id": 1334777764,
+    "issue": 72,
+    "pull_request": 156,
+    "parent_commit": "aad95c059add01ff183bf4a24b1b7cf32802412e",
+    "commit": "bcb79473eaa6bb2e09f287462aa932a7fdab4957",
+    "tree": "9fe624d903c429940cd8de0bd05bdf66fd63e4a1",
+    "state": "LEAF_COMPLETE_UNMERGED",
+    "selected_ci_run": 32288317843,
+    "evidence_ceiling": "PLAY_SAFE_WEBVIEW_COMPILE_PACKAGE_ONLY"
+  },
+  "replay": {
+    "gradle_task": ":composeApp:testPlaySafeDebugUnitTest",
+    "required_paths": [
+      "composeApp/src/androidMain/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewBrowserActionPlatform.kt",
+      "composeApp/src/androidMain/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewContracts.kt",
+      "composeApp/src/androidUnitTest/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewContractsTest.kt",
+      "docs/architecture/ADR-0031-play-safe-webview-actions.md"
+    ],
+    "maximum_claim": "KMP_REFERENCE_UNIT_REPLAY"
+  },
+  "claims_not_made": [
+    "WEBVIEW_RUNTIME",
+    "EMULATOR",
+    "PHYSICAL_DEVICE",
+    "PRODUCTION_ORIGIN",
+    "NATIVE_PARITY",
+    "RN_PARITY",
+    "MERGED",
+    "RELEASED",
+    "PRODUCTION"
+  ],
+  "effects": {
+    "source_checkout": "PUBLIC_READ_ONLY",
+    "dependency_download": "CI_ONLY",
+    "upstream_write": false,
+    "external_page_navigation": false,
+    "production_write": false
+  }
+}
