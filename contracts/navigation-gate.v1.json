@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "contract_id": "bounded-navigation",
+  "reference": {
+    "repository": "ed3c/kotlin-auto-webview",
+    "commit": "d87693c05bd00e0092e7e50ebd31f38dfc486874",
+    "mode": "READ_ONLY_CONTROL"
+  },
+  "shared_implementation": false,
+  "admitted_effects": ["LOCAL_FIXTURE_NAVIGATION"],
+  "forbidden_effects": ["EXTERNAL_NETWORK", "PRODUCTION_WRITE", "RELEASE"],
+  "happy_path": {
+    "scenario_id": "confirmed-navigation",
+    "initial_page": "page-a",
+    "target_page": "page-b",
+    "operation_id": "nav-001",
+    "transitions": [
+      "IDLE",
+      "WAITING_FOR_CONFIRMATION",
+      "EXECUTING",
+      "VERIFYING",
+      "APPLIED"
+    ],
+    "dispatch_count": 1
+  },
+  "negative_controls": [
+    "DISPATCH_BEFORE_APPROVAL",
+    "DUPLICATE_OPERATION",
+    "STALE_PAGE_GENERATION",
+    "CALLBACK_WITH_MISMATCHED_POSTCONDITION"
+  ],
+  "evidence_ceiling": "LOCAL_DETERMINISTIC_DOMAIN_PARITY"
+}

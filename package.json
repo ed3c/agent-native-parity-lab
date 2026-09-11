@@ -1,0 +1,11 @@
+{
+  "name": "agent-native-parity-lab-harness",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node harness/validate-contract.mjs && node --test harness/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

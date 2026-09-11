@@ -1,0 +1,66 @@
+name: parity
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+
+  kotlin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.14.3"
+      - run: gradle :android-domain:test --no-daemon
+      - run: mkdir -p evidence && gradle -q :android-domain:run --no-daemon > evidence/android.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-evidence
+          path: evidence/android.json
+
+  swift:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path ios-domain
+      - run: mkdir -p evidence && swift run --package-path ios-domain EmitEvidence > evidence/ios.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-evidence
+          path: evidence/ios.json
+
+  parity:
+    needs: [contract, kotlin, swift]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-evidence
+          path: evidence
+      - uses: actions/download-artifact@v4
+        with:
+          name: ios-evidence
+          path: evidence
+      - run: node harness/compare-evidence.mjs evidence/android.json evidence/ios.json
