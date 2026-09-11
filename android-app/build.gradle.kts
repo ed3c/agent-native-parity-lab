@@ -12,6 +12,7 @@ android {
 
     defaultConfig {
         minSdk = 24
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -24,6 +25,7 @@ android {
     }
 
     sourceSets.getByName("test").resources.srcDir(rootProject.file("fixtures"))
+    sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("fixtures"))
 }
 
 kotlin {
@@ -38,6 +40,10 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
 }
 
 tasks.withType<Test>().configureEach {
