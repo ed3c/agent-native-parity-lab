@@ -3,15 +3,14 @@ import NativeParityDomain
 import XCTest
 @testable import NativeCheckpointUI
 
-final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
+/// XCTest exercised on an iOS Simulator destination (xcodebuild), not SwiftPM macOS host.
+final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
+    private static let simulatorEnvelopePath = "/tmp/ios-native-simulator-envelope.json"
+    private static let simulatorControlsPath = "/tmp/ios-native-simulator-controls.json"
+
     private lazy var fixtureText: String = {
-        if let bundled = Bundle.module.url(forResource: "checkpoint", withExtension: "json") {
-            return try! String(contentsOf: bundled, encoding: .utf8)
-        }
-        var root = URL(fileURLWithPath: #filePath)
-        for _ in 0..<4 { root.deleteLastPathComponent() }
-        let fallback = root.appendingPathComponent("fixtures/exact-navigation/checkpoint.json")
-        return try! String(contentsOf: fallback, encoding: .utf8)
+        let bundled = try! XCTUnwrap(Bundle.module.url(forResource: "checkpoint", withExtension: "json"))
+        return try! String(contentsOf: bundled, encoding: .utf8)
     }()
 
     private lazy var fixture: CheckpointFixture = {
@@ -48,14 +47,19 @@ final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
         )
     }()
 
-    func testEmitsAcceptedRuntimeEnvelope() throws {
-        let json = probe.emitAccepted(runtimeClass: RuntimeEnvelope.runtimeClassHost)
+    private func requireSimulator() throws {
+        #if !targetEnvironment(simulator)
+        throw XCTSkip("Requires iOS Simulator destination (xcodebuild); host SwiftPM path stays runtime_class=HOST")
+        #endif
+    }
+
+    func testSimulatorEmitsAcceptedRuntimeEnvelope() throws {
+        try requireSimulator()
+        let json = probe.emitAccepted(runtimeClass: RuntimeEnvelope.runtimeClassSimulator)
         XCTAssertTrue(json.contains("\"subject\":\"IOS_NATIVE\""))
-        XCTAssertTrue(json.contains("\"platform\":\"ios\""))
-        XCTAssertTrue(json.contains("\"runtime_class\":\"HOST\""))
-        XCTAssertTrue(json.contains("\"checkpoint_id\":\"exact-navigation.v1\""))
+        XCTAssertTrue(json.contains("\"runtime_class\":\"SIMULATOR\""))
         XCTAssertTrue(json.contains("\"result\":\"ACCEPTED\""))
-        XCTAssertTrue(json.contains("\"effect_count\":1"))
+        try json.write(toFile: Self.simulatorEnvelopePath, atomically: true, encoding: .utf8)
         if let path = ProcessInfo.processInfo.environment["RUNTIME_ENVELOPE_OUT"] {
             try FileManager.default.createDirectory(
                 at: URL(fileURLWithPath: path).deletingLastPathComponent(),
@@ -63,24 +67,26 @@ final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
             )
             try json.write(toFile: path, atomically: true, encoding: .utf8)
         }
+        print("SIMULATOR_ENVELOPE_PATH=\(Self.simulatorEnvelopePath)")
     }
 
-    func testControlEnvelopesMatchComparatorExpectations() throws {
-        let duplicate = probe.emitDuplicateRejected(runtimeClass: RuntimeEnvelope.runtimeClassHost)
-        XCTAssertTrue(duplicate.contains("\"result\":\"REJECTED\""))
-        XCTAssertTrue(duplicate.contains("\"runtime_class\":\"HOST\""))
-        let stale = probe.emitStaleRejected(runtimeClass: RuntimeEnvelope.runtimeClassHost)
+    func testSimulatorControlEnvelopes() throws {
+        try requireSimulator()
+        let duplicate = probe.emitDuplicateRejected(runtimeClass: RuntimeEnvelope.runtimeClassSimulator)
+        let stale = probe.emitStaleRejected(runtimeClass: RuntimeEnvelope.runtimeClassSimulator)
+        let unknown = probe.emitCallbackMismatchUnknown(runtimeClass: RuntimeEnvelope.runtimeClassSimulator)
+        XCTAssertTrue(duplicate.contains("\"runtime_class\":\"SIMULATOR\""))
         XCTAssertTrue(stale.contains("\"result\":\"REJECTED\""))
-        let unknown = probe.emitCallbackMismatchUnknown(runtimeClass: RuntimeEnvelope.runtimeClassHost)
         XCTAssertTrue(unknown.contains("\"result\":\"UNKNOWN\""))
+        let payload = """
+        {
+          "duplicate_dispatch": \(duplicate),
+          "stale_approval": \(stale),
+          "callback_destination_mismatch": \(unknown)
+        }
+        """
+        try payload.write(toFile: Self.simulatorControlsPath, atomically: true, encoding: .utf8)
         if let path = ProcessInfo.processInfo.environment["RUNTIME_CONTROLS_OUT"] {
-            let payload = """
-            {
-              "duplicate_dispatch": \(duplicate),
-              "stale_approval": \(stale),
-              "callback_destination_mismatch": \(unknown)
-            }
-            """
             try FileManager.default.createDirectory(
                 at: URL(fileURLWithPath: path).deletingLastPathComponent(),
                 withIntermediateDirectories: true

@@ -25,6 +25,9 @@ let package = Package(
             dependencies: [
                 "NativeCheckpointUI",
                 .product(name: "NativeParityDomain", package: "ios-domain"),
+            ],
+            resources: [
+                .copy("Resources/checkpoint.json"),
             ]
         ),
     ]

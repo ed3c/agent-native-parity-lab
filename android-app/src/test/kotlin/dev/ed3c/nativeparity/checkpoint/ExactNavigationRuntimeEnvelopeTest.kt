@@ -27,10 +27,11 @@ class ExactNavigationRuntimeEnvelopeTest {
 
     @Test
     fun emitsAcceptedRuntimeEnvelope() {
-        val json = probe.emitAccepted()
+        val json = probe.emitAccepted(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST)
         val parsed = Json.parseToJsonElement(json).jsonObject
         assertEquals("ANDROID_NATIVE", parsed.getValue("subject").jsonPrimitive.content)
         assertEquals("android", parsed.getValue("platform").jsonPrimitive.content)
+        assertEquals("HOST", parsed.getValue("runtime_class").jsonPrimitive.content)
         assertEquals(fixtureSha256, parsed.getValue("fixture_sha256").jsonPrimitive.content)
         assertEquals("exact-navigation.v1", parsed.getValue("checkpoint_id").jsonPrimitive.content)
         assertEquals("ACCEPTED", parsed.getValue("result").jsonPrimitive.content)
@@ -45,14 +46,24 @@ class ExactNavigationRuntimeEnvelopeTest {
 
     @Test
     fun controlEnvelopesMatchComparatorExpectations() {
-        val duplicate = Json.parseToJsonElement(probe.emitDuplicateRejected()).jsonObject
+        val duplicate =
+            Json.parseToJsonElement(
+                probe.emitDuplicateRejected(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST),
+            ).jsonObject
         assertEquals("REJECTED", duplicate.getValue("result").jsonPrimitive.content)
         assertEquals("0", duplicate.getValue("effect_count").jsonPrimitive.content)
+        assertEquals("HOST", duplicate.getValue("runtime_class").jsonPrimitive.content)
 
-        val stale = Json.parseToJsonElement(probe.emitStaleRejected()).jsonObject
+        val stale =
+            Json.parseToJsonElement(
+                probe.emitStaleRejected(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST),
+            ).jsonObject
         assertEquals("REJECTED", stale.getValue("result").jsonPrimitive.content)
 
-        val unknown = Json.parseToJsonElement(probe.emitCallbackMismatchUnknown()).jsonObject
+        val unknown =
+            Json.parseToJsonElement(
+                probe.emitCallbackMismatchUnknown(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST),
+            ).jsonObject
         assertEquals("UNKNOWN", unknown.getValue("result").jsonPrimitive.content)
         assertTrue(unknown.getValue("effect_count").jsonPrimitive.content.toInt() <= 1)
 
@@ -60,9 +71,9 @@ class ExactNavigationRuntimeEnvelopeTest {
             val payload =
                 """
                 {
-                  "duplicate_dispatch": ${probe.emitDuplicateRejected()},
-                  "stale_approval": ${probe.emitStaleRejected()},
-                  "callback_destination_mismatch": ${probe.emitCallbackMismatchUnknown()}
+                  "duplicate_dispatch": ${probe.emitDuplicateRejected(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST)},
+                  "stale_approval": ${probe.emitStaleRejected(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST)},
+                  "callback_destination_mismatch": ${probe.emitCallbackMismatchUnknown(runtimeClass = RuntimeEnvelope.RUNTIME_CLASS_HOST)}
                 }
                 """.trimIndent()
             File(path).apply {
