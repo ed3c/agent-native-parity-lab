@@ -1,5 +1,6 @@
 package dev.ed3c.nativeparity.checkpoint
 
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.assertEquals
@@ -41,15 +42,26 @@ class ExactNavigationRuntimeInstrumentedTest {
         assertTrue(json.contains(""""result":"ACCEPTED""""))
         assertEquals(1, Regex(""""effect_count":1""").findAll(json).count())
 
-        // Primary pull path: world-readable emulator tmp (no run-as required).
-        File("/data/local/tmp/android-native-runtime-envelope.json").writeText(json)
+        // Log markers for CI scrape fallback (instrumentation stdout/logcat).
+        Log.i(TAG, "<<<ANDROID_EMU_ENVELOPE_BEGIN>>>")
+        Log.i(TAG, json)
+        Log.i(TAG, "<<<ANDROID_EMU_ENVELOPE_END>>>")
+        println("<<<ANDROID_EMU_ENVELOPE_BEGIN>>>")
+        println(json)
+        println("<<<ANDROID_EMU_ENVELOPE_END>>>")
 
-        val outDir = context.filesDir
-        File(outDir, "android-native-runtime-envelope.json").writeText(json)
+        // Primary pull path: world-readable emulator tmp (no run-as required).
+        runCatching { File("/data/local/tmp/android-native-runtime-envelope.json").writeText(json) }
+
+        File(context.filesDir, "android-native-runtime-envelope.json").writeText(json)
 
         val external = context.getExternalFilesDir(null)
         if (external != null) {
             File(external, "android-native-runtime-envelope.json").writeText(json)
         }
+    }
+
+    companion object {
+        private const val TAG = "NativeParityEnvelope"
     }
 }

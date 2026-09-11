@@ -5,9 +5,6 @@ import XCTest
 
 /// XCTest exercised on an iOS Simulator destination (xcodebuild), not SwiftPM macOS host.
 final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
-    private static let simulatorEnvelopePath = "/tmp/ios-native-simulator-envelope.json"
-    private static let simulatorControlsPath = "/tmp/ios-native-simulator-controls.json"
-
     private lazy var fixtureText: String = {
         let bundled = try! XCTUnwrap(Bundle.module.url(forResource: "checkpoint", withExtension: "json"))
         return try! String(contentsOf: bundled, encoding: .utf8)
@@ -53,21 +50,27 @@ final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
         #endif
     }
 
+    private func emitMarked(_ label: String, _ payload: String) {
+        // XCTest on Simulator does not share /tmp with simctl spawn reliably for SPM
+        // library tests; CI scrapes these markers from the xcodebuild log.
+        print("<<<\(label)_BEGIN>>>")
+        print(payload)
+        print("<<<\(label)_END>>>")
+        fflush(stdout)
+    }
+
     func testSimulatorEmitsAcceptedRuntimeEnvelope() throws {
         try requireSimulator()
         let json = probe.emitAccepted(runtimeClass: RuntimeEnvelope.runtimeClassSimulator)
         XCTAssertTrue(json.contains("\"subject\":\"IOS_NATIVE\""))
         XCTAssertTrue(json.contains("\"runtime_class\":\"SIMULATOR\""))
         XCTAssertTrue(json.contains("\"result\":\"ACCEPTED\""))
-        try json.write(toFile: Self.simulatorEnvelopePath, atomically: true, encoding: .utf8)
-        if let path = ProcessInfo.processInfo.environment["RUNTIME_ENVELOPE_OUT"] {
-            try FileManager.default.createDirectory(
-                at: URL(fileURLWithPath: path).deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try json.write(toFile: path, atomically: true, encoding: .utf8)
-        }
-        print("SIMULATOR_ENVELOPE_PATH=\(Self.simulatorEnvelopePath)")
+        emitMarked("IOS_SIM_ENVELOPE", json)
+        try? json.write(
+            toFile: NSTemporaryDirectory() + "ios-native-simulator-envelope.json",
+            atomically: true,
+            encoding: .utf8
+        )
     }
 
     func testSimulatorControlEnvelopes() throws {
@@ -85,13 +88,6 @@ final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
           "callback_destination_mismatch": \(unknown)
         }
         """
-        try payload.write(toFile: Self.simulatorControlsPath, atomically: true, encoding: .utf8)
-        if let path = ProcessInfo.processInfo.environment["RUNTIME_CONTROLS_OUT"] {
-            try FileManager.default.createDirectory(
-                at: URL(fileURLWithPath: path).deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            try payload.write(toFile: path, atomically: true, encoding: .utf8)
-        }
+        emitMarked("IOS_SIM_CONTROLS", payload)
     }
 }

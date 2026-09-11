@@ -97,7 +97,7 @@ jobs:
         with:
           node-version: 22
       - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "system-images;android-30;google_apis;x86_64"
+      - run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "system-images;android-29;default;x86_64"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
@@ -114,23 +114,34 @@ jobs:
       - name: Instrumentation on managed emulator (required EMULATOR envelope)
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
+          api-level: 29
           arch: x86_64
-          target: google_apis
+          target: default
+          force-avd-creation: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          disable-animations: false
           script: |
             set -euo pipefail
             mkdir -p evidence
-            gradle :android-app:connectedDebugAndroidTest --no-daemon
-            # Prefer world-readable emulator tmp; fall back to run-as app files.
+            adb wait-for-device
+            adb shell 'while [[ -z $(getprop sys.boot_completed) ]]; do sleep 1; done'
+            gradle :android-app:connectedDebugAndroidTest --no-daemon | tee evidence/android-emulator-instrumentation.log
+            # Prefer world-readable emulator tmp; fall back to run-as; then log markers.
             if ! adb shell cat /data/local/tmp/android-native-runtime-envelope.json \
                 > evidence/android-native-emulator-envelope.json 2>/dev/null; then
               adb shell "run-as dev.ed3c.nativeparity.checkpoint cat files/android-native-runtime-envelope.json" \
                 > evidence/android-native-emulator-envelope.json 2>/dev/null || true
             fi
             if [ ! -s evidence/android-native-emulator-envelope.json ]; then
-              echo "FATAL: emulator instrumentation did not produce pullable EMULATOR envelope" >&2
-              exit 1
+              adb logcat -d -s NativeParityEnvelope:I > evidence/android-emulator-logcat.txt || true
+              cat evidence/android-emulator-instrumentation.log evidence/android-emulator-logcat.txt \
+                > evidence/android-emulator-scrape.txt || true
+              node harness/extract-marked-payload.mjs \
+                ANDROID_EMU_ENVELOPE \
+                evidence/android-emulator-scrape.txt \
+                evidence/android-native-emulator-envelope.json
             fi
+            test -s evidence/android-native-emulator-envelope.json
             node harness/validate-runtime-envelope.mjs \
               --require-runtime-class EMULATOR \
               evidence/android-native-emulator-envelope.json
@@ -148,6 +159,9 @@ jobs:
             evidence/android-native-host-envelope.json
             evidence/android-native-host-controls.json
             evidence/android-native-runtime-status.json
+            evidence/android-emulator-instrumentation.log
+            evidence/android-emulator-logcat.txt
+            evidence/android-emulator-scrape.txt
 
   ios-native-runtime:
     runs-on: macos-15
@@ -181,16 +195,21 @@ jobs:
               -derivedDataPath ../DerivedData \
               -only-testing:NativeCheckpointUITests/ExactNavigationSimulatorRuntimeEnvelopeTests \
               test ) | tee evidence/ios-simulator-xcodebuild.log
-          xcrun simctl spawn "${UDID}" cat /tmp/ios-native-simulator-envelope.json \
-            > evidence/ios-native-simulator-envelope.json
+          # SPM Simulator XCTest /tmp is not reliably visible to simctl spawn; scrape markers.
+          node harness/extract-marked-payload.mjs \
+            IOS_SIM_ENVELOPE \
+            evidence/ios-simulator-xcodebuild.log \
+            evidence/ios-native-simulator-envelope.json
+          node harness/extract-marked-payload.mjs \
+            IOS_SIM_CONTROLS \
+            evidence/ios-simulator-xcodebuild.log \
+            evidence/ios-native-simulator-controls.json || true
           test -s evidence/ios-native-simulator-envelope.json
           node harness/validate-runtime-envelope.mjs \
             --require-runtime-class SIMULATOR \
             evidence/ios-native-simulator-envelope.json
           # Fail closed: primary IOS_NATIVE artifact must be SIMULATOR, never HOST copy.
           cp evidence/ios-native-simulator-envelope.json evidence/ios-native-envelope.json
-          xcrun simctl spawn "${UDID}" cat /tmp/ios-native-simulator-controls.json \
-            > evidence/ios-native-simulator-controls.json || true
           printf '%s\n' '{"subject":"IOS_NATIVE","platform":"ios","status":"PASS","checkpoint_id":"exact-navigation.v1","runtime_class":"SIMULATOR","reason":"iOS Simulator XCTest produced validated SIMULATOR envelope"}' \
             > evidence/ios-native-runtime-status.json
           echo "IOS_NATIVE ceiling candidate: SIMULATOR_RUNTIME_PARITY (simulator SIMULATOR PASS)"
