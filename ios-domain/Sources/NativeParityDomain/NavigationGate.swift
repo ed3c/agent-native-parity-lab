@@ -48,7 +48,10 @@ public final class NavigationGate {
 
     @discardableResult
     public func propose(_ candidate: NavigationProposal) -> Bool {
-        guard state == .idle, candidate.sourceGeneration == currentGeneration else {
+        let canStart = state == .idle || state == .applied || state == .denied || state == .preempted
+        guard canStart else { return false }
+        guard candidate.sourceGeneration == currentGeneration,
+              !dispatchedOperations.contains(candidate.operationID) else {
             move(to: .denied)
             return false
         }

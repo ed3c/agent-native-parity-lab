@@ -25,9 +25,21 @@ final class NavigationGateTests: XCTestCase {
         gate.platformCallback(operationID: command.operationID, accepted: true)
         gate.verify(operationID: command.operationID, landedPageID: "page-b")
 
-        XCTAssertNil(gate.approve(operationID: "nav-001"))
+        XCTAssertFalse(gate.propose(.init(operationID: "nav-001", targetPageID: "page-c", sourceGeneration: 1)))
         XCTAssertEqual(gate.dispatchCount, 1)
-        XCTAssertEqual(gate.state, .applied)
+        XCTAssertEqual(gate.state, .denied)
+    }
+
+    func testDistinctOperationCanStartAfterAppliedResult() {
+        let gate = NavigationGate(initialPageID: "page-a", initialGeneration: 1)
+        gate.propose(.init(operationID: "nav-001", targetPageID: "page-b", sourceGeneration: 1))
+        let first = gate.approve(operationID: "nav-001")!
+        gate.platformCallback(operationID: first.operationID, accepted: true)
+        gate.verify(operationID: first.operationID, landedPageID: "page-b")
+
+        XCTAssertTrue(gate.propose(.init(operationID: "nav-002", targetPageID: "page-c", sourceGeneration: 1)))
+        XCTAssertEqual(gate.approve(operationID: "nav-002")?.operationID, "nav-002")
+        XCTAssertEqual(gate.dispatchCount, 2)
     }
 
     func testPageGenerationChangePreemptsPendingProposal() {
@@ -47,6 +59,18 @@ final class NavigationGateTests: XCTestCase {
         XCTAssertTrue(gate.platformCallback(operationID: command.operationID, accepted: true))
 
         XCTAssertEqual(gate.verify(operationID: command.operationID, landedPageID: "page-c"), .unknown)
+        XCTAssertEqual(gate.dispatchCount, 1)
+    }
+
+    func testUnknownEffectBlocksNewProposalUntilReconciliationExists() {
+        let gate = NavigationGate(initialPageID: "page-a", initialGeneration: 1)
+        gate.propose(.init(operationID: "nav-001", targetPageID: "page-b", sourceGeneration: 1))
+        let command = gate.approve(operationID: "nav-001")!
+        gate.platformCallback(operationID: command.operationID, accepted: true)
+        gate.verify(operationID: command.operationID, landedPageID: "page-c")
+
+        XCTAssertFalse(gate.propose(.init(operationID: "nav-002", targetPageID: "page-d", sourceGeneration: 1)))
+        XCTAssertEqual(gate.state, .unknown)
         XCTAssertEqual(gate.dispatchCount, 1)
     }
 

@@ -41,7 +41,10 @@ class NavigationGate(
     private val dispatchedOperations = mutableSetOf<String>()
 
     fun propose(candidate: NavigationProposal): Boolean {
-        if (state != GateState.IDLE || candidate.sourceGeneration != currentGeneration) {
+        val canStart = state == GateState.IDLE || state == GateState.APPLIED ||
+            state == GateState.DENIED || state == GateState.PREEMPTED
+        if (!canStart) return false
+        if (candidate.sourceGeneration != currentGeneration || candidate.operationId in dispatchedOperations) {
             moveTo(GateState.DENIED)
             return false
         }
