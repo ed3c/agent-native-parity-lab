@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "receipt_id": "exact-navigation-plan-binding-v1",
+  "checkpoint_id": "exact-navigation",
+  "receipt_role": "DETERMINISTIC_TEST_FIXTURE",
+  "authority_identity": "NOT_VERIFIED",
+  "plan_sha256": "9ff2a685df39e700406848683f1133a8bae1ada69ef2dfdbe5ef1e61979ed086",
+  "source": {
+    "repository": "ed3c/kotlin-auto-webview",
+    "commit": "bcb79473eaa6bb2e09f287462aa932a7fdab4957",
+    "tree": "9fe624d903c429940cd8de0bd05bdf66fd63e4a1"
+  },
+  "lab_parent": {
+    "repository": "ed3c/agent-native-parity-lab",
+    "commit": "1474ced5dcfb04db9d4f051d377ed17d8cb12b3d",
+    "tree": "35ff632fd085b16376850ec498a381626d6bfccf"
+  },
+  "maximum_claim": "LOCAL_PLAN_APPROVAL_BINDING",
+  "claims_not_made": [
+    "PLAN_QUALITY",
+    "REVIEWER_IDENTITY",
+    "NATIVE_RUNTIME_PARITY",
+    "KMP_RUNTIME_PARITY",
+    "MERGED",
+    "RELEASED",
+    "PRODUCTION"
+  ]
+}
