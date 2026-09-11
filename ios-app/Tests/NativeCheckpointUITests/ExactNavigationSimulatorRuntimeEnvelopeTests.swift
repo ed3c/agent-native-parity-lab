@@ -63,10 +63,10 @@ final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
         <<<\(label)_B64>>>\(b64)<<<\(label)_B64_END>>>
         """
         print(block)
-        if let data = Data((block + "\n").utf8) {
-            FileHandle.standardOutput.write(data)
-            FileHandle.standardError.write(data)
-        }
+        // Data(String.UTF8View) is non-optional (IOS_HOST_SWIFT_IFLET_NONOPTIONAL_DATA).
+        let data = Data((block + "\n").utf8)
+        FileHandle.standardOutput.write(data)
+        FileHandle.standardError.write(data)
         fflush(stdout)
         fflush(stderr)
         NSLog("%@", "<<<\(label)_B64>>>\(b64)<<<\(label)_B64_END>>>")
