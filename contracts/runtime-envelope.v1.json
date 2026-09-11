@@ -48,17 +48,30 @@
     "BUILD_PARITY",
     "CONTRACT_PARITY",
     "HOST_TEST_PARITY",
-    "SIMULATOR_RUNTIME_PARITY"
-  ],
-  "maximum_claim_if_all_green": "KMP_NATIVE_RUNTIME_PROBE_PASS",
-  "claims_not_made_by_default": [
     "SIMULATOR_RUNTIME_PARITY",
+    "PHYSICAL_DEVICE_PARITY"
+  ],
+  "maximum_claim_if_all_green": "SIMULATOR_RUNTIME_PARITY",
+  "claims_not_made_by_default": [
     "PHYSICAL_DEVICE_PARITY",
     "WEBVIEW_RUNTIME",
     "WKWEBVIEW_RUNTIME",
     "A4",
     "MERGED",
     "RELEASED",
-    "PRODUCTION"
-  ]
+    "PRODUCTION",
+    "KMP_RUNTIME_PARITY"
+  ],
+  "runtime_classes": [
+    "HOST",
+    "EMULATOR",
+    "SIMULATOR"
+  ],
+  "runtime_class_notes": {
+    "HOST": "JVM unit test or SwiftPM macOS host process \u2014 not emulator/Simulator",
+    "EMULATOR": "Android instrumentation on managed emulator",
+    "SIMULATOR": "iOS XCTest on Simulator destination (not SwiftPM host-only)",
+    "PHYSICAL": "FORBIDDEN in this atom; local-computer Human gate later"
+  },
+  "maximum_claim_with_kmp_absent": "SIMULATOR_RUNTIME_PARITY_NATIVE_WITH_KMP_ABSENT"
 }
