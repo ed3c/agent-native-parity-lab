@@ -3,6 +3,10 @@ import NativeParityDomain
 import CryptoKit
 
 public enum RuntimeEnvelope {
+    public static let runtimeClassHost = "HOST"
+    public static let runtimeClassEmulator = "EMULATOR"
+    public static let runtimeClassSimulator = "SIMULATOR"
+
     private static let acceptedEvents = [
         "navigation_requested",
         "navigation_approved",
@@ -20,7 +24,8 @@ public enum RuntimeEnvelope {
         platform: String,
         fixtureSha256: String,
         operationID: String,
-        destination: String
+        destination: String,
+        runtimeClass: String
     ) -> String {
         let events = acceptedEvents.enumerated().map { index, name -> String in
             let sequence = index + 1
@@ -29,7 +34,7 @@ public enum RuntimeEnvelope {
             let payloadSha = sha256Hex(payload)
             return "{\"sequence\":\(sequence),\"name\":\"\(name)\",\"operation_id\":\"\(operationID)\",\"destination\":\"\(destination)\",\"payload_sha256\":\"\(payloadSha)\"}"
         }.joined(separator: ",")
-        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(events)],\"result\":\"ACCEPTED\",\"effect_count\":1}"
+        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"runtime_class\":\"\(runtimeClass)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(events)],\"result\":\"ACCEPTED\",\"effect_count\":1}"
     }
 
     public static func rejectedJSON(
@@ -38,13 +43,14 @@ public enum RuntimeEnvelope {
         fixtureSha256: String,
         operationID: String,
         destination: String,
-        eventName: String
+        eventName: String,
+        runtimeClass: String
     ) -> String {
         let payload =
             "{\"name\":\"\(eventName)\",\"operationId\":\"\(operationID)\",\"destination\":\"\(destination)\",\"sequence\":1}"
         let event =
             "{\"sequence\":1,\"name\":\"\(eventName)\",\"operation_id\":\"\(operationID)\",\"destination\":\"\(destination)\",\"payload_sha256\":\"\(sha256Hex(payload))\"}"
-        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(event)],\"result\":\"REJECTED\",\"effect_count\":0}"
+        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"runtime_class\":\"\(runtimeClass)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(event)],\"result\":\"REJECTED\",\"effect_count\":0}"
     }
 
     public static func unknownJSON(
@@ -53,7 +59,8 @@ public enum RuntimeEnvelope {
         fixtureSha256: String,
         operationID: String,
         requestedDestination: String,
-        observedDestination: String
+        observedDestination: String,
+        runtimeClass: String
     ) -> String {
         let names = [
             "navigation_requested",
@@ -68,7 +75,7 @@ public enum RuntimeEnvelope {
                 "{\"name\":\"\(name)\",\"operationId\":\"\(operationID)\",\"destination\":\"\(destination)\",\"sequence\":\(sequence)}"
             return "{\"sequence\":\(sequence),\"name\":\"\(name)\",\"operation_id\":\"\(operationID)\",\"destination\":\"\(destination)\",\"payload_sha256\":\"\(sha256Hex(payload))\"}"
         }.joined(separator: ",")
-        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(events)],\"result\":\"UNKNOWN\",\"effect_count\":1}"
+        return "{\"subject\":\"\(subject)\",\"platform\":\"\(platform)\",\"runtime_class\":\"\(runtimeClass)\",\"fixture_sha256\":\"\(fixtureSha256)\",\"checkpoint_id\":\"exact-navigation.v1\",\"events\":[\(events)],\"result\":\"UNKNOWN\",\"effect_count\":1}"
     }
 }
 
@@ -99,7 +106,11 @@ public struct ExactNavigationRuntimeProbe {
         self.staleGeneration = staleGeneration
     }
 
-    public func emitAccepted(subject: String = "IOS_NATIVE", platform: String = "ios") -> String {
+    public func emitAccepted(
+        subject: String = "IOS_NATIVE",
+        platform: String = "ios",
+        runtimeClass: String = RuntimeEnvelope.runtimeClassHost
+    ) -> String {
         let port = RecordingNavigationEffectPort()
         let controller = ExactNavigationCheckpointController(
             gate: NavigationGate(initialPageID: initialPageID, initialGeneration: initialGeneration),
@@ -126,11 +137,16 @@ public struct ExactNavigationRuntimeProbe {
             platform: platform,
             fixtureSha256: fixtureSha256,
             operationID: operationID,
-            destination: targetPageID
+            destination: targetPageID,
+            runtimeClass: runtimeClass
         )
     }
 
-    public func emitDuplicateRejected(subject: String = "IOS_NATIVE", platform: String = "ios") -> String {
+    public func emitDuplicateRejected(
+        subject: String = "IOS_NATIVE",
+        platform: String = "ios",
+        runtimeClass: String = RuntimeEnvelope.runtimeClassHost
+    ) -> String {
         let port = RecordingNavigationEffectPort()
         let command = NavigationCommand(operationID: operationID, targetPageID: targetPageID)
         precondition(port.dispatch(command).status == .accepted)
@@ -141,11 +157,16 @@ public struct ExactNavigationRuntimeProbe {
             fixtureSha256: fixtureSha256,
             operationID: operationID,
             destination: targetPageID,
-            eventName: "duplicate_dispatch_rejected"
+            eventName: "duplicate_dispatch_rejected",
+            runtimeClass: runtimeClass
         )
     }
 
-    public func emitStaleRejected(subject: String = "IOS_NATIVE", platform: String = "ios") -> String {
+    public func emitStaleRejected(
+        subject: String = "IOS_NATIVE",
+        platform: String = "ios",
+        runtimeClass: String = RuntimeEnvelope.runtimeClassHost
+    ) -> String {
         let port = RecordingNavigationEffectPort()
         let controller = ExactNavigationCheckpointController(
             gate: NavigationGate(initialPageID: initialPageID, initialGeneration: initialGeneration),
@@ -165,11 +186,16 @@ public struct ExactNavigationRuntimeProbe {
             fixtureSha256: fixtureSha256,
             operationID: operationID,
             destination: targetPageID,
-            eventName: "stale_approval_rejected"
+            eventName: "stale_approval_rejected",
+            runtimeClass: runtimeClass
         )
     }
 
-    public func emitCallbackMismatchUnknown(subject: String = "IOS_NATIVE", platform: String = "ios") -> String {
+    public func emitCallbackMismatchUnknown(
+        subject: String = "IOS_NATIVE",
+        platform: String = "ios",
+        runtimeClass: String = RuntimeEnvelope.runtimeClassHost
+    ) -> String {
         let port = RecordingNavigationEffectPort()
         let controller = ExactNavigationCheckpointController(
             gate: NavigationGate(initialPageID: initialPageID, initialGeneration: initialGeneration),
@@ -196,7 +222,8 @@ public struct ExactNavigationRuntimeProbe {
             fixtureSha256: fixtureSha256,
             operationID: operationID,
             requestedDestination: targetPageID,
-            observedDestination: mismatchedPageID
+            observedDestination: mismatchedPageID,
+            runtimeClass: runtimeClass
         )
     }
 }

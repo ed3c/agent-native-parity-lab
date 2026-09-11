@@ -34,6 +34,8 @@ Both implementations must reject or contain:
 contracts/       shared behavior, never shared implementation
 android-domain/  independent Kotlin state machine and tests
 ios-domain/      independent Swift state machine and tests
+android-app/     native checkpoint + host/emulator runtime envelopes
+ios-app/         native checkpoint + host/Simulator runtime envelopes
 harness/         contract validation and normalized evidence comparison
 evidence/        generated output; only `.gitkeep` is tracked
 docs/n-class/    unverified questions and the shortest falsifiable plan
@@ -63,13 +65,24 @@ node --test harness/*.test.mjs
 ```
 
 Kotlin and Swift verification run in GitHub Actions. Exact commands are recorded in `AGENTS.md`
-and `.github/workflows/ci.yml`.
+and `.github/workflows/ci.yml`. Runtime elevation lives in
+`.github/workflows/kmp-native-runtime-probe.yml`.
 
 ## Evidence ceiling
 
-A green run proves local deterministic parity and that the four negative controls discriminate
-the protected behavior. Native WebView/WKWebView adapters, screenshots, simulator/device evidence,
-performance comparison, and total-cost claims remain `NOT_IMPLEMENTED` or `NOT_EXERCISED`.
+Runtime envelopes carry an explicit `runtime_class`:
+
+| `runtime_class` | Means | Promotable to `SIMULATOR_RUNTIME_PARITY`? |
+|---|---|---|
+| `HOST` | JVM unit / SwiftPM macOS host | No |
+| `EMULATOR` | Android managed-emulator instrumentation | Yes (Android native) |
+| `SIMULATOR` | iOS Simulator XCTest via xcodebuild | Yes (iOS native) |
+| `PHYSICAL` | Real device | Forbidden in this atom |
+
+A green elevated run proves local deterministic parity plus emulator/Simulator exercise of the
+native subjects. It does **not** prove WebView/WKWebView navigation, Accessibility enablement,
+Store distribution, physical-device parity, or KMP runtime PASS while KMP remains ABSENT on the
+pinned reference.
 
 This project is an independent experiment based on public engineering descriptions. It is not
 affiliated with or endorsed by Shopify.

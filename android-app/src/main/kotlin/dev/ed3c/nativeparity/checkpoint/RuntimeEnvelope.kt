@@ -11,6 +11,10 @@ private val ACCEPTED_EVENTS =
     )
 
 object RuntimeEnvelope {
+    const val RUNTIME_CLASS_HOST = "HOST"
+    const val RUNTIME_CLASS_EMULATOR = "EMULATOR"
+    const val RUNTIME_CLASS_SIMULATOR = "SIMULATOR"
+
     fun sha256Hex(text: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { each -> "%02x".format(each) }
@@ -22,6 +26,7 @@ object RuntimeEnvelope {
         fixtureSha256: String,
         operationId: String,
         destination: String,
+        runtimeClass: String,
     ): String {
         val events =
             ACCEPTED_EVENTS.mapIndexed { index, name ->
@@ -30,7 +35,7 @@ object RuntimeEnvelope {
                     """{"name":"$name","operationId":"$operationId","destination":"$destination","sequence":$sequence}"""
                 """{"sequence":$sequence,"name":"$name","operation_id":"$operationId","destination":"$destination","payload_sha256":"${sha256Hex(payload)}"}"""
             }.joinToString(",")
-        return """{"subject":"$subject","platform":"$platform","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$events],"result":"ACCEPTED","effect_count":1}"""
+        return """{"subject":"$subject","platform":"$platform","runtime_class":"$runtimeClass","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$events],"result":"ACCEPTED","effect_count":1}"""
     }
 
     fun rejectedJson(
@@ -40,12 +45,13 @@ object RuntimeEnvelope {
         operationId: String,
         destination: String,
         eventName: String,
+        runtimeClass: String,
     ): String {
         val payload =
             """{"name":"$eventName","operationId":"$operationId","destination":"$destination","sequence":1}"""
         val event =
             """{"sequence":1,"name":"$eventName","operation_id":"$operationId","destination":"$destination","payload_sha256":"${sha256Hex(payload)}"}"""
-        return """{"subject":"$subject","platform":"$platform","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$event],"result":"REJECTED","effect_count":0}"""
+        return """{"subject":"$subject","platform":"$platform","runtime_class":"$runtimeClass","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$event],"result":"REJECTED","effect_count":0}"""
     }
 
     fun unknownJson(
@@ -55,6 +61,7 @@ object RuntimeEnvelope {
         operationId: String,
         requestedDestination: String,
         observedDestination: String,
+        runtimeClass: String,
     ): String {
         val events =
             listOf(
@@ -69,7 +76,7 @@ object RuntimeEnvelope {
                     """{"name":"$name","operationId":"$operationId","destination":"$destination","sequence":$sequence}"""
                 """{"sequence":$sequence,"name":"$name","operation_id":"$operationId","destination":"$destination","payload_sha256":"${sha256Hex(payload)}"}"""
             }.joinToString(",")
-        return """{"subject":"$subject","platform":"$platform","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$events],"result":"UNKNOWN","effect_count":1}"""
+        return """{"subject":"$subject","platform":"$platform","runtime_class":"$runtimeClass","fixture_sha256":"$fixtureSha256","checkpoint_id":"exact-navigation.v1","events":[$events],"result":"UNKNOWN","effect_count":1}"""
     }
 }
 
@@ -82,7 +89,11 @@ class ExactNavigationRuntimeProbe(
     private val initialGeneration: Long,
     private val staleGeneration: Long,
 ) {
-    fun emitAccepted(subject: String = "ANDROID_NATIVE", platform: String = "android"): String {
+    fun emitAccepted(
+        subject: String = "ANDROID_NATIVE",
+        platform: String = "android",
+        runtimeClass: String = RuntimeEnvelope.RUNTIME_CLASS_HOST,
+    ): String {
         val port = RecordingNavigationEffectPort()
         val controller =
             ExactNavigationCheckpointController(
@@ -93,10 +104,21 @@ class ExactNavigationRuntimeProbe(
         check(controller.approve(operationId))
         check(controller.callbackAndObserve(operationId, true, targetPageId) == dev.ed3c.nativeparity.GateState.APPLIED)
         check(port.commands.size == 1)
-        return RuntimeEnvelope.acceptedJson(subject, platform, fixtureSha256, operationId, targetPageId)
+        return RuntimeEnvelope.acceptedJson(
+            subject,
+            platform,
+            fixtureSha256,
+            operationId,
+            targetPageId,
+            runtimeClass,
+        )
     }
 
-    fun emitDuplicateRejected(subject: String = "ANDROID_NATIVE", platform: String = "android"): String {
+    fun emitDuplicateRejected(
+        subject: String = "ANDROID_NATIVE",
+        platform: String = "android",
+        runtimeClass: String = RuntimeEnvelope.RUNTIME_CLASS_HOST,
+    ): String {
         val port = RecordingNavigationEffectPort()
         val command = dev.ed3c.nativeparity.NavigationCommand(operationId, targetPageId)
         check(port.dispatch(command).status == DispatchStatus.ACCEPTED)
@@ -108,10 +130,15 @@ class ExactNavigationRuntimeProbe(
             operationId,
             targetPageId,
             "duplicate_dispatch_rejected",
+            runtimeClass,
         )
     }
 
-    fun emitStaleRejected(subject: String = "ANDROID_NATIVE", platform: String = "android"): String {
+    fun emitStaleRejected(
+        subject: String = "ANDROID_NATIVE",
+        platform: String = "android",
+        runtimeClass: String = RuntimeEnvelope.RUNTIME_CLASS_HOST,
+    ): String {
         val port = RecordingNavigationEffectPort()
         val controller =
             ExactNavigationCheckpointController(
@@ -129,10 +156,15 @@ class ExactNavigationRuntimeProbe(
             operationId,
             targetPageId,
             "stale_approval_rejected",
+            runtimeClass,
         )
     }
 
-    fun emitCallbackMismatchUnknown(subject: String = "ANDROID_NATIVE", platform: String = "android"): String {
+    fun emitCallbackMismatchUnknown(
+        subject: String = "ANDROID_NATIVE",
+        platform: String = "android",
+        runtimeClass: String = RuntimeEnvelope.RUNTIME_CLASS_HOST,
+    ): String {
         val port = RecordingNavigationEffectPort()
         val controller =
             ExactNavigationCheckpointController(
@@ -152,6 +184,7 @@ class ExactNavigationRuntimeProbe(
             operationId,
             targetPageId,
             mismatchedPageId,
+            runtimeClass,
         )
     }
 }

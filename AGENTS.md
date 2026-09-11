@@ -47,12 +47,37 @@ UNKNOWN
 EXTERNAL_AUTHORITY_REQUIRED
 ```
 
-Green CI for the first atom proves only deterministic domain parity. It does not prove WebView,
-WKWebView, simulator, device, production, cost, or Shopify-equivalent results.
+## Runtime class vocabulary (do not confuse)
 
-`KMP_NATIVE_RUNTIME_PROBE` measures three subjects against `exact-navigation.v1`. ABSENT KMP or
-NOT_EXERCISED simulator/emulator jobs are valid probe outcomes. Do not invent A4 unless the
+```text
+HOST        JVM unit test / SwiftPM macOS host process
+EMULATOR    Android instrumentation on a managed emulator
+SIMULATOR   iOS XCTest on an iOS Simulator destination (xcodebuild)
+PHYSICAL    Forbidden in this lab atom; Human local-computer gate later
+```
+
+HOST must never be relabeled as SIMULATOR/EMULATOR. Primary ANDROID_NATIVE / IOS_NATIVE CI
+artifacts for simulator-elevation must carry `runtime_class=EMULATOR` / `SIMULATOR` respectively.
+
+## Evidence ceiling ladder
+
+```text
+BUILD_PARITY
+  → CONTRACT_PARITY
+  → HOST_TEST_PARITY
+  → SIMULATOR_RUNTIME_PARITY     # ceiling for SIMULATOR_RUNTIME_ELEVATION
+  → PHYSICAL_DEVICE_PARITY       # FORBIDDEN unless a later Human gate says otherwise
+```
+
+Green CI for the first atom proves only deterministic domain parity. It does not prove WebView,
+WKWebView, physical device, production, cost, or Shopify-equivalent results.
+
+`KMP_NATIVE_RUNTIME_PROBE` measures three subjects against `exact-navigation.v1`. ABSENT KMP on
+pin `bcb79473…` remains a valid probe outcome — do not fake KMP PASS. Do not invent A4 unless the
 comparator yields a stable reproducible mismatch fingerprint on the exact subject.
+
+Maximum claim when elevated natives are green and KMP remains ABSENT:
+`SIMULATOR_RUNTIME_PARITY_NATIVE_WITH_KMP_ABSENT`.
 
 ## Fixed verification commands
 
@@ -71,8 +96,10 @@ Runtime probe (CI matrix in `.github/workflows/kmp-native-runtime-probe.yml`):
 
 ```bash
 node harness/kmp-runtime-probe.mjs <kmp-checkout> fixtures/exact-navigation/checkpoint.json evidence/kmp.json android
-RUNTIME_ENVELOPE_OUT=evidence/android-native-envelope.json gradle :android-app:testDebugUnitTest --tests 'dev.ed3c.nativeparity.checkpoint.ExactNavigationRuntimeEnvelopeTest'
-RUNTIME_ENVELOPE_OUT=evidence/ios-native-envelope.json swift test --package-path ios-app --filter ExactNavigationRuntimeEnvelopeTests
+RUNTIME_ENVELOPE_OUT=evidence/android-native-host-envelope.json gradle :android-app:testDebugUnitTest --tests 'dev.ed3c.nativeparity.checkpoint.ExactNavigationRuntimeEnvelopeTest'
+# Emulator instrumentation (CI): connectedDebugAndroidTest → runtime_class=EMULATOR
+RUNTIME_ENVELOPE_OUT=evidence/ios-native-host-envelope.json swift test --package-path ios-app --filter ExactNavigationRuntimeEnvelopeTests
+# Simulator XCTest (CI): xcodebuild -destination 'platform=iOS Simulator,...' → runtime_class=SIMULATOR
 node harness/compare-runtime-envelopes.mjs evidence/android-native-envelope.json evidence/ios-native-envelope.json evidence/kmp.json
 ```
 

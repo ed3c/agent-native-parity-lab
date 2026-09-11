@@ -3,7 +3,9 @@ name: kmp-native-runtime-probe
 on:
   pull_request:
   push:
-    branches: [probe/kmp-native-runtime]
+    branches:
+      - probe/kmp-native-runtime
+      - probe/simulator-runtime-elevation
 
 permissions:
   contents: read
@@ -17,7 +19,7 @@ jobs:
         with:
           node-version: 22
       - run: node harness/validate-runtime-envelope.mjs --selftest
-      - run: node --test harness/validate-runtime-envelope.test.mjs harness/kmp-runtime-probe.test.mjs
+      - run: node --test harness/validate-runtime-envelope.test.mjs harness/kmp-runtime-probe.test.mjs harness/extract-marked-payload.test.mjs
 
   kmp-android-reference:
     runs-on: ubuntu-latest
@@ -91,99 +93,134 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - uses: android-actions/setup-android@v3
+      - name: Enable KVM group perms
+        run: |
+          set -euo pipefail
+          # Public ubuntu-latest exposes /dev/kvm; default perms are root:kvm 0660 so ProbeKVM
+          # falls back to -accel off (EMULATOR_KVM_UNAVAILABLE_ADB_EXIT_224). Documented
+          # reactivecircus udev rule + chmod makes the device rw for the job user.
+          if [ ! -e /dev/kvm ]; then
+            echo "FATAL: /dev/kvm missing; software emulation is too slow/flaky for EMULATOR evidence" >&2
+            exit 1
+          fi
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo chmod 666 /dev/kvm
+          ls -l /dev/kvm
+          python3 -c 'import os; os.open("/dev/kvm", os.O_RDWR); print("KVM rw ok")'
       - run: sdkmanager "platforms;android-36" "build-tools;35.0.0" "system-images;android-30;google_apis;x86_64"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
-      - name: Host unit path emits ANDROID_NATIVE envelope
+      - name: Host unit path emits ANDROID_NATIVE envelope (runtime_class=HOST)
         run: |
           mkdir -p evidence
           RUNTIME_ENVELOPE_OUT="$PWD/evidence/android-native-host-envelope.json" \
-          RUNTIME_CONTROLS_OUT="$PWD/evidence/android-native-controls.json" \
+          RUNTIME_CONTROLS_OUT="$PWD/evidence/android-native-host-controls.json" \
             gradle :android-app:testDebugUnitTest --tests 'dev.ed3c.nativeparity.checkpoint.ExactNavigationRuntimeEnvelopeTest' --no-daemon
           test -s evidence/android-native-host-envelope.json
-          node harness/validate-runtime-envelope.mjs evidence/android-native-host-envelope.json
-      - name: Instrumentation on emulator (elevation beyond JVM)
-        id: emulator
-        continue-on-error: true
+          node harness/validate-runtime-envelope.mjs \
+            --require-runtime-class HOST \
+            evidence/android-native-host-envelope.json
+      - name: Instrumentation on managed emulator (required EMULATOR envelope)
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
           arch: x86_64
           target: google_apis
-          script: |
-            mkdir -p evidence
-            gradle :android-app:connectedDebugAndroidTest --no-daemon
-            adb shell "run-as dev.ed3c.nativeparity.checkpoint cat files/android-native-runtime-envelope.json" \
-              > evidence/android-native-runtime-envelope.json || true
-            if [ ! -s evidence/android-native-runtime-envelope.json ]; then
-              adb exec-out run-as dev.ed3c.nativeparity.checkpoint cat files/android-native-runtime-envelope.json \
-                > evidence/android-native-runtime-envelope.json || true
-            fi
-            if [ ! -s evidence/android-native-runtime-envelope.json ]; then
-              # Fall back to pulling external files dir if present
-              PKG_PATH=$(adb shell pm path dev.ed3c.nativeparity.checkpoint.test | head -1 | tr -d '\r' | cut -d: -f2 || true)
-              echo "instrumentation artifact path probe: ${PKG_PATH}"
-              find /tmp -name 'android-native-runtime-envelope.json' 2>/dev/null || true
-            fi
-            if [ -s evidence/android-native-runtime-envelope.json ]; then
-              node harness/validate-runtime-envelope.mjs evidence/android-native-runtime-envelope.json
-              echo "status=PASS" >> "$GITHUB_OUTPUT"
-            else
-              echo "status=NOT_EXERCISED" >> "$GITHUB_OUTPUT"
-              printf '%s\n' '{"subject":"ANDROID_NATIVE","platform":"android","status":"NOT_EXERCISED","checkpoint_id":"exact-navigation.v1","reason":"emulator instrumentation did not produce pullable envelope artifact; host envelope remains authoritative for this run"}' \
-                > evidence/android-native-runtime-status.json
-            fi
-      - name: Record emulator exercise ceiling
-        run: |
-          mkdir -p evidence
-          if [ "${{ steps.emulator.outcome }}" != "success" ] || [ "${{ steps.emulator.outputs.status }}" != "PASS" ]; then
-            printf '%s\n' '{"subject":"ANDROID_NATIVE","platform":"android","status":"NOT_EXERCISED","checkpoint_id":"exact-navigation.v1","reason":"android emulator instrumentation not fully exercised or artifact missing; host ANDROID_NATIVE envelope emitted from JVM unit path"}' \
-              > evidence/android-native-runtime-status.json
-            cp evidence/android-native-host-envelope.json evidence/android-native-envelope.json
-            echo "ANDROID_NATIVE ceiling: HOST_TEST_PARITY (emulator NOT_EXERCISED)"
-          else
-            cp evidence/android-native-runtime-envelope.json evidence/android-native-envelope.json
-            echo "ANDROID_NATIVE ceiling: SIMULATOR_RUNTIME_PARITY candidate (emulator PASS)"
-          fi
+          force-avd-creation: true
+          emulator-boot-timeout: 900
+          disable-linux-hw-accel: false
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: false
+          # reactivecircus runs `script` via /usr/bin/sh (dash) and splits lines;
+          # invoke a single bash entrypoint so pipefail + multiline stay intact
+          # (EMULATOR_SH_PIPEFAIL_ILLEGAL). Fail-closed EMULATOR validation stays in the script.
+          script: bash harness/android-emulator-instrumentation.sh
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: android-native-runtime
+          if-no-files-found: ignore
           path: |
             evidence/android-native-envelope.json
+            evidence/android-native-emulator-envelope.json
             evidence/android-native-host-envelope.json
-            evidence/android-native-controls.json
+            evidence/android-native-host-controls.json
             evidence/android-native-runtime-status.json
-            evidence/android-native-runtime-envelope.json
+            evidence/android-emulator-instrumentation.log
+            evidence/android-emulator-logcat.txt
+            evidence/android-emulator-scrape.txt
 
   ios-native-runtime:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - name: Host package path emits IOS_NATIVE envelope
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Host package path emits IOS_NATIVE envelope (runtime_class=HOST)
         run: |
           mkdir -p evidence
           RUNTIME_ENVELOPE_OUT="$PWD/evidence/ios-native-host-envelope.json" \
-          RUNTIME_CONTROLS_OUT="$PWD/evidence/ios-native-controls.json" \
+          RUNTIME_CONTROLS_OUT="$PWD/evidence/ios-native-host-controls.json" \
             swift test --package-path ios-app --filter ExactNavigationRuntimeEnvelopeTests
           test -s evidence/ios-native-host-envelope.json
-          node harness/validate-runtime-envelope.mjs evidence/ios-native-host-envelope.json
-          cp evidence/ios-native-host-envelope.json evidence/ios-native-envelope.json
-      - name: iOS Simulator XCTest status
+          node harness/validate-runtime-envelope.mjs \
+            --require-runtime-class HOST \
+            evidence/ios-native-host-envelope.json
+      - name: iOS Simulator XCTest (required SIMULATOR envelope)
         run: |
-          # Honest ceiling: this PR does not wire an .xcodeproj / xcodebuild Simulator destination.
-          printf '%s\n' '{"subject":"IOS_NATIVE","platform":"ios","status":"NOT_EXERCISED","checkpoint_id":"exact-navigation.v1","reason":"iOS Simulator XCTest not wired (SwiftPM host tests only); no SIMULATOR_RUNTIME_PARITY claim"}' \
+          set -euo pipefail
+          mkdir -p evidence DerivedData
+          UDID=$(node harness/pick-ios-simulator.mjs)
+          echo "Using Simulator UDID=${UDID}"
+          xcrun simctl boot "${UDID}" || true
+          xcrun simctl bootstatus "${UDID}" -b
+          set -o pipefail
+          ( cd ios-app && xcodebuild \
+              -scheme NativeCheckpointUI \
+              -destination "platform=iOS Simulator,id=${UDID}" \
+              -derivedDataPath ../DerivedData \
+              -only-testing:NativeCheckpointUITests/ExactNavigationSimulatorRuntimeEnvelopeTests \
+              test ) | tee evidence/ios-simulator-xcodebuild.log
+          # Guest /tmp is not visible to simctl spawn (SIMULATOR_ENVELOPE_FILE_MISSING_AFTER_XCTEST).
+          # Harvest compact JSON / base64 markers printed by XCTest into this log.
+          node harness/extract-marked-payload.mjs \
+            IOS_SIM_ENVELOPE \
+            evidence/ios-simulator-xcodebuild.log \
+            evidence/ios-native-simulator-envelope.json
+          node harness/extract-marked-payload.mjs \
+            IOS_SIM_CONTROLS \
+            evidence/ios-simulator-xcodebuild.log \
+            evidence/ios-native-simulator-controls.json || true
+          test -s evidence/ios-native-simulator-envelope.json
+          node harness/validate-runtime-envelope.mjs \
+            --require-runtime-class SIMULATOR \
+            evidence/ios-native-simulator-envelope.json
+          # Fail closed: primary IOS_NATIVE artifact must be SIMULATOR, never HOST copy.
+          cp evidence/ios-native-simulator-envelope.json evidence/ios-native-envelope.json
+          printf '%s\n' '{"subject":"IOS_NATIVE","platform":"ios","status":"PASS","checkpoint_id":"exact-navigation.v1","runtime_class":"SIMULATOR","reason":"iOS Simulator XCTest produced validated SIMULATOR envelope"}' \
             > evidence/ios-native-runtime-status.json
-          echo "IOS_NATIVE ceiling: HOST_TEST_PARITY (simulator NOT_EXERCISED)"
+          echo "IOS_NATIVE ceiling candidate: SIMULATOR_RUNTIME_PARITY (simulator SIMULATOR PASS)"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: ios-native-runtime
+          if-no-files-found: ignore
           path: |
             evidence/ios-native-envelope.json
+            evidence/ios-native-simulator-envelope.json
             evidence/ios-native-host-envelope.json
-            evidence/ios-native-controls.json
+            evidence/ios-native-host-controls.json
+            evidence/ios-native-simulator-controls.json
             evidence/ios-native-runtime-status.json
+            evidence/ios-simulator-xcodebuild.log
 
   runtime-parity:
     needs:
@@ -214,16 +251,33 @@ jobs:
         with:
           name: kmp-reference-ios-runtime
           path: evidence
-      - name: Compare runtime envelopes with fingerprinting
+      - name: Compare elevated simulator envelopes when present
         run: |
+          set -euo pipefail
           ls -la evidence
+          test -s evidence/android-native-envelope.json
+          test -s evidence/ios-native-envelope.json
+          # Fail closed: primary native envelopes must be elevated classes.
+          node harness/validate-runtime-envelope.mjs \
+            --require-runtime-class EMULATOR \
+            evidence/android-native-envelope.json
+          node harness/validate-runtime-envelope.mjs \
+            --require-runtime-class SIMULATOR \
+            evidence/ios-native-envelope.json
           node harness/compare-runtime-envelopes.mjs \
             evidence/android-native-envelope.json \
             evidence/ios-native-envelope.json \
             evidence/kmp-reference-android-runtime.json \
-            evidence/android-native-controls.json \
-            evidence/ios-native-controls.json
-          echo "NOTE: KMP iOS reference receipt retained as measurement artifact; comparator uses one KMP absence receipt plus native envelopes."
+            evidence/android-native-host-controls.json \
+            evidence/ios-native-host-controls.json
+          echo "NOTE: HOST envelopes retained as separately labeled artifacts; comparator uses elevated EMULATOR/SIMULATOR natives. KMP ABSENT on pin remains valid."
+          if [ -f evidence/android-native-host-envelope.json ] && [ -f evidence/ios-native-host-envelope.json ]; then
+            echo "HOST-only report (non-promotable):"
+            node harness/compare-runtime-envelopes.mjs \
+              evidence/android-native-host-envelope.json \
+              evidence/ios-native-host-envelope.json \
+              evidence/kmp-reference-android-runtime.json || true
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: runtime-parity-summary

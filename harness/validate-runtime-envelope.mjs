@@ -9,6 +9,7 @@ const SUBJECTS = new Set(["KMP_REFERENCE", "ANDROID_NATIVE", "IOS_NATIVE"]);
 const PLATFORMS = new Set(["android", "ios"]);
 const RESULTS = new Set(["ACCEPTED", "REJECTED", "UNKNOWN"]);
 const PROBE_STATUSES = new Set(["PASS", "ABSENT", "NOT_IMPLEMENTED", "NOT_EXERCISED"]);
+const RUNTIME_CLASSES = new Set(["HOST", "EMULATOR", "SIMULATOR"]);
 const ACCEPTED_EVENTS = [
   "navigation_requested",
   "navigation_approved",
@@ -45,10 +46,19 @@ export function validateAbsenceReceipt(receipt) {
   if (receipt.fixture_sha256 !== undefined) {
     assert.match(receipt.fixture_sha256, /^[a-f0-9]{64}$/);
   }
+  if (receipt.runtime_class !== undefined) {
+    assert.ok(
+      RUNTIME_CLASSES.has(receipt.runtime_class),
+      `invalid runtime_class on absence receipt: ${receipt.runtime_class}`,
+    );
+  }
   return receipt;
 }
 
-export function validateRuntimeEnvelope(envelope, { expectedFixtureSha256 } = {}) {
+export function validateRuntimeEnvelope(
+  envelope,
+  { expectedFixtureSha256, requireRuntimeClass } = {},
+) {
   assert.ok(isObject(envelope), "envelope must be an object");
   assert.ok(SUBJECTS.has(envelope.subject), `invalid subject: ${envelope.subject}`);
   assert.ok(PLATFORMS.has(envelope.platform), `invalid platform: ${envelope.platform}`);
@@ -61,6 +71,18 @@ export function validateRuntimeEnvelope(envelope, { expectedFixtureSha256 } = {}
   assert.ok(RESULTS.has(envelope.result), `invalid result: ${envelope.result}`);
   assert.equal(typeof envelope.effect_count, "number");
   assert.ok(Number.isInteger(envelope.effect_count) && envelope.effect_count >= 0);
+
+  assert.ok(
+    typeof envelope.runtime_class === "string" && RUNTIME_CLASSES.has(envelope.runtime_class),
+    `runtime_class required and must be one of ${[...RUNTIME_CLASSES].join("|")}; got ${envelope.runtime_class}`,
+  );
+  if (requireRuntimeClass) {
+    assert.equal(
+      envelope.runtime_class,
+      requireRuntimeClass,
+      `runtime_class must be ${requireRuntimeClass} (got ${envelope.runtime_class}) — refusing HOST masquerading as elevated runtime`,
+    );
+  }
 
   let previousSequence = 0;
   for (const [index, event] of envelope.events.entries()) {
@@ -167,7 +189,14 @@ function payloadDigest(parts) {
   return sha256Hex(JSON.stringify(parts));
 }
 
-export function buildAcceptedEnvelope({ subject, platform, fixtureSha256, operationId, destination }) {
+export function buildAcceptedEnvelope({
+  subject,
+  platform,
+  fixtureSha256,
+  operationId,
+  destination,
+  runtimeClass = "HOST",
+}) {
   const events = ACCEPTED_EVENTS.map((name, index) => ({
     sequence: index + 1,
     name,
@@ -178,12 +207,17 @@ export function buildAcceptedEnvelope({ subject, platform, fixtureSha256, operat
   return {
     subject,
     platform,
+    runtime_class: runtimeClass,
     fixture_sha256: fixtureSha256,
     checkpoint_id: "exact-navigation.v1",
     events,
     result: "ACCEPTED",
     effect_count: 1,
   };
+}
+
+export function isElevatedRuntimeClass(runtimeClass) {
+  return runtimeClass === "EMULATOR" || runtimeClass === "SIMULATOR";
 }
 
 async function runSelftest() {
@@ -194,6 +228,7 @@ async function runSelftest() {
     fixtureSha256: digest,
     operationId: "nav-001",
     destination: "page-b",
+    runtimeClass: "EMULATOR",
   });
   const ios = buildAcceptedEnvelope({
     subject: "IOS_NATIVE",
@@ -201,10 +236,22 @@ async function runSelftest() {
     fixtureSha256: digest,
     operationId: "nav-001",
     destination: "page-b",
+    runtimeClass: "SIMULATOR",
   });
-  validateRuntimeEnvelope(android, { expectedFixtureSha256: digest });
-  validateRuntimeEnvelope(ios, { expectedFixtureSha256: digest });
+  validateRuntimeEnvelope(android, {
+    expectedFixtureSha256: digest,
+    requireRuntimeClass: "EMULATOR",
+  });
+  validateRuntimeEnvelope(ios, {
+    expectedFixtureSha256: digest,
+    requireRuntimeClass: "SIMULATOR",
+  });
   assert.deepEqual(compareRuntimeEnvelopes(android, ios), []);
+
+  const hostMasquerade = { ...android, runtime_class: "HOST" };
+  assert.throws(() =>
+    validateRuntimeEnvelope(hostMasquerade, { requireRuntimeClass: "EMULATOR" }),
+  );
 
   const badFixture = { ...ios, fixture_sha256: "0".repeat(64) };
   assert.ok(compareRuntimeEnvelopes(android, badFixture).some((item) => item.startsWith("FIXTURE_SHA256")));
@@ -281,19 +328,37 @@ async function main(args) {
     await runSelftest();
     return;
   }
-  if (args[0]) {
-    const envelope = JSON.parse(await readFile(args[0], "utf8"));
+  const requireIdx = args.indexOf("--require-runtime-class");
+  let requireRuntimeClass;
+  const fileArgs = [];
+  for (let i = 0; i < args.length; i += 1) {
+    if (args[i] === "--require-runtime-class") {
+      requireRuntimeClass = args[i + 1];
+      i += 1;
+      continue;
+    }
+    fileArgs.push(args[i]);
+  }
+  if (fileArgs[0]) {
+    const envelope = JSON.parse(await readFile(fileArgs[0], "utf8"));
     if (envelope.status && envelope.status !== "PASS") {
       validateAbsenceReceipt(envelope);
       console.log(`runtime-envelope absence receipt: ${envelope.status}`);
     } else {
       const { digest } = await loadFixtureDigest();
-      validateRuntimeEnvelope(envelope, { expectedFixtureSha256: digest });
-      console.log("runtime-envelope validation: PASS");
+      validateRuntimeEnvelope(envelope, {
+        expectedFixtureSha256: digest,
+        requireRuntimeClass,
+      });
+      console.log(
+        `runtime-envelope validation: PASS (runtime_class=${envelope.runtime_class})`,
+      );
     }
     return;
   }
-  console.log("usage: node harness/validate-runtime-envelope.mjs --selftest | <envelope.json>");
+  console.log(
+    "usage: node harness/validate-runtime-envelope.mjs --selftest | [--require-runtime-class CLASS] <envelope.json>",
+  );
   process.exit(2);
 }
 

@@ -4,14 +4,14 @@ import XCTest
 @testable import NativeCheckpointUI
 
 final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
-    private lazy var fixtureURL: URL = {
+    private lazy var fixtureText: String = {
+        if let bundled = Bundle.module.url(forResource: "checkpoint", withExtension: "json") {
+            return try! String(contentsOf: bundled, encoding: .utf8)
+        }
         var root = URL(fileURLWithPath: #filePath)
         for _ in 0..<4 { root.deleteLastPathComponent() }
-        return root.appendingPathComponent("fixtures/exact-navigation/checkpoint.json")
-    }()
-
-    private lazy var fixtureText: String = {
-        try! String(contentsOf: fixtureURL, encoding: .utf8)
+        let fallback = root.appendingPathComponent("fixtures/exact-navigation/checkpoint.json")
+        return try! String(contentsOf: fallback, encoding: .utf8)
     }()
 
     private lazy var fixture: CheckpointFixture = {
@@ -49,9 +49,10 @@ final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
     }()
 
     func testEmitsAcceptedRuntimeEnvelope() throws {
-        let json = probe.emitAccepted()
+        let json = probe.emitAccepted(runtimeClass: RuntimeEnvelope.runtimeClassHost)
         XCTAssertTrue(json.contains("\"subject\":\"IOS_NATIVE\""))
         XCTAssertTrue(json.contains("\"platform\":\"ios\""))
+        XCTAssertTrue(json.contains("\"runtime_class\":\"HOST\""))
         XCTAssertTrue(json.contains("\"checkpoint_id\":\"exact-navigation.v1\""))
         XCTAssertTrue(json.contains("\"result\":\"ACCEPTED\""))
         XCTAssertTrue(json.contains("\"effect_count\":1"))
@@ -65,11 +66,12 @@ final class ExactNavigationRuntimeEnvelopeTests: XCTestCase {
     }
 
     func testControlEnvelopesMatchComparatorExpectations() throws {
-        let duplicate = probe.emitDuplicateRejected()
+        let duplicate = probe.emitDuplicateRejected(runtimeClass: RuntimeEnvelope.runtimeClassHost)
         XCTAssertTrue(duplicate.contains("\"result\":\"REJECTED\""))
-        let stale = probe.emitStaleRejected()
+        XCTAssertTrue(duplicate.contains("\"runtime_class\":\"HOST\""))
+        let stale = probe.emitStaleRejected(runtimeClass: RuntimeEnvelope.runtimeClassHost)
         XCTAssertTrue(stale.contains("\"result\":\"REJECTED\""))
-        let unknown = probe.emitCallbackMismatchUnknown()
+        let unknown = probe.emitCallbackMismatchUnknown(runtimeClass: RuntimeEnvelope.runtimeClassHost)
         XCTAssertTrue(unknown.contains("\"result\":\"UNKNOWN\""))
         if let path = ProcessInfo.processInfo.environment["RUNTIME_CONTROLS_OUT"] {
             let payload = """
