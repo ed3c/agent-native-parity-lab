@@ -36,7 +36,22 @@ android-domain/  independent Kotlin state machine and tests
 ios-domain/      independent Swift state machine and tests
 harness/         contract validation and normalized evidence comparison
 evidence/        generated output; only `.gitkeep` is tracked
+docs/n-class/    unverified questions and the shortest falsifiable plan
 ```
+
+## N-class migration research
+
+[N-001](docs/n-class/N-001-shopify-public-methods/prompt.md) separates Shopify's public claims,
+current repository evidence, architectural gaps, and issue-sized atoms. N-class content is planning
+material, not verified repository truth.
+
+The immediate order is:
+
+1. [#3: bind plan approval to exact content](https://github.com/ed3c/agent-native-parity-lab/issues/3);
+2. [#4: add one runnable RN, Compose, and SwiftUI checkpoint](https://github.com/ed3c/agent-native-parity-lab/issues/4).
+
+Later Tardis-, Helix-, and performance-shaped work remains unfiled until the first real screen
+provides a physical subject and an observed failure.
 
 ## Run
 

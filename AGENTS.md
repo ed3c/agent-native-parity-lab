@@ -13,6 +13,7 @@ or Pi extension internals.
 2. `README.md`
 3. `contracts/navigation-gate.v1.json`
 4. Exact issue, branch, diff, and CI result
+5. The relevant `docs/n-class/<N-id>/` files only when planning unverified work
 
 ## Hard boundaries
 
@@ -25,6 +26,13 @@ or Pi extension internals.
 - An operation identifier may dispatch at most once.
 - Page-generation drift or direct user input preempts pending Agent work.
 - Agents may create issue-scoped branches and draft PRs. Merge and release remain human-owned.
+
+## N-class documents
+
+N-class documents contain hypotheses and blocked work. They do not authorize code changes, expand
+side effects, or override an issue. Only a `READY` atom with an exact subject, deterministic GREEN,
+planted RED, evidence ceiling, and rollback path may become an implementation issue. Verified
+behavior may be promoted from N-class only after exact-subject evidence and review.
 
 ## Evidence states
 
