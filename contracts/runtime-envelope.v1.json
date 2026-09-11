@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "envelope_id": "runtime-envelope.v1",
+  "checkpoint_id": "exact-navigation.v1",
+  "subjects": [
+    "KMP_REFERENCE",
+    "ANDROID_NATIVE",
+    "IOS_NATIVE"
+  ],
+  "platforms": [
+    "android",
+    "ios"
+  ],
+  "results": [
+    "ACCEPTED",
+    "REJECTED",
+    "UNKNOWN"
+  ],
+  "probe_statuses": [
+    "PASS",
+    "ABSENT",
+    "NOT_IMPLEMENTED",
+    "NOT_EXERCISED"
+  ],
+  "required_event_names_accepted": [
+    "navigation_requested",
+    "navigation_approved",
+    "navigation_dispatched",
+    "navigation_verified"
+  ],
+  "comparator_checks": [
+    "fixture_sha256",
+    "event_order_name_count",
+    "operation_id_relation",
+    "destination_relation",
+    "duplicate_dispatch_rejected",
+    "stale_approval_rejected",
+    "callback_destination_mismatch_unknown"
+  ],
+  "fixture": "fixtures/exact-navigation/checkpoint.json",
+  "fixture_sha256": "ab84f10c5b0d4fd224c82dd781697ae14aeb3a932d6707b1beea1fec7a98a919",
+  "kmp_reference": {
+    "repository": "ed3c/kotlin-auto-webview",
+    "commit": "bcb79473eaa6bb2e09f287462aa932a7fdab4957",
+    "tree": "9fe624d903c429940cd8de0bd05bdf66fd63e4a1"
+  },
+  "evidence_ceiling_ladder": [
+    "BUILD_PARITY",
+    "CONTRACT_PARITY",
+    "HOST_TEST_PARITY",
+    "SIMULATOR_RUNTIME_PARITY"
+  ],
+  "maximum_claim_if_all_green": "KMP_NATIVE_RUNTIME_PROBE_PASS",
+  "claims_not_made_by_default": [
+    "SIMULATOR_RUNTIME_PARITY",
+    "PHYSICAL_DEVICE_PARITY",
+    "WEBVIEW_RUNTIME",
+    "WKWEBVIEW_RUNTIME",
+    "A4",
+    "MERGED",
+    "RELEASED",
+    "PRODUCTION"
+  ]
+}
