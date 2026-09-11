@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node harness/validate-contract.mjs && node --test harness/*.test.mjs"
+    "test": "node harness/validate-contract.mjs && node --test harness/*.test.mjs",
+    "test:runtime-envelope": "node harness/validate-runtime-envelope.mjs --selftest && node --test harness/validate-runtime-envelope.test.mjs harness/kmp-runtime-probe.test.mjs"
   },
   "engines": {
     "node": ">=22"
