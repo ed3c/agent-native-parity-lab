@@ -2,11 +2,13 @@
 
 ## Question
 
-Can this repository test the useful parts of Shopify's publicly described React Native-to-native
+Can this repository test the useful parts of Shopify's publicly described reference-to-native
 migration method with independent Swift and Kotlin implementations, shared behavioral evidence,
 and bounded side effects?
 
-This is a feasibility experiment, not a Shopify implementation.
+Shopify used React Native as its reference. This lab currently has no React Native subject, so the
+first control is a real KMP application. That substitution tests the migration method and evidence
+loop; it cannot prove React Native-specific cost, behavior, or economics.
 
 ## Public references
 
@@ -15,7 +17,7 @@ This is a feasibility experiment, not a Shopify implementation.
 
 The articles publicly describe:
 
-- React Native as the reference for separate SwiftUI and Jetpack Compose implementations;
+- an existing implementation as reference for separate SwiftUI and Jetpack Compose implementations;
 - small ordered screen checkpoints;
 - tests, visual review, two adversarial reviews, and human approval;
 - specialized migration roles for source inspection, behavior documentation, platform planning,
@@ -35,17 +37,32 @@ platform state architecture, reviewer configuration, code-generation policy, mod
 costs, or complete Agent contribution ratio. This lab must not label inferred Redux, MVI, Clean
 Architecture, KMP, Rust, prompts, or orchestration as Shopify's implementation.
 
-## Pinned current subject
+KMP is this lab's first reference control only. It is not attributed to Shopify.
+
+## Pinned current subjects
+
+### Lab parent
 
 - Repository: `ed3c/agent-native-parity-lab`
-- Baseline: `c7b0d1398432a9899831bbeecaa2b581c392333a`
+- Parent head: `8836205ee8cb67fc3a50c4b58b103f86291e44b6`
 - Existing proof: `LOCAL_DETERMINISTIC_DOMAIN_PARITY`
-- Read-only control: `ed3c/kotlin-auto-webview@d87693c05bd00e0092e7e50ebd31f38dfc486874`
+
+### KMP reference
+
+- Repository: `ed3c/kotlin-auto-webview`
+- Issue / Draft PR: `#72 / #156`
+- Selected head: `bcb79473eaa6bb2e09f287462aa932a7fdab4957`
+- Selected tree: `9fe624d903c429940cd8de0bd05bdf66fd63e4a1`
+- State: `LEAF_COMPLETE_UNMERGED`
+- Upstream ceiling: `PLAY_SAFE_WEBVIEW_COMPILE_PACKAGE_ONLY`
 
 ## Hard boundaries
 
-- Shared behavior and evidence are allowed; shared mobile runtime implementation is not.
+- The KMP source is checked out read-only at the exact commit and is never vendored or edited.
+- Shared behavior and evidence are allowed; shared mobile runtime implementation is not copied into
+  the future native targets.
 - Use bundled fixtures until an issue explicitly earns a larger effect boundary.
-- No credential, production URL, account mutation, telemetry upload, merge, or release.
+- No credential, production URL, account mutation, telemetry upload, upstream write, merge, or
+  release.
 - One checkpoint must fail usefully before generalized tooling is admitted.
 - A green check may claim only the evidence ceiling declared by its issue.

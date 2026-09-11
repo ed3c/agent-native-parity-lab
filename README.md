@@ -5,7 +5,7 @@ An evidence-first experiment for maintaining two independent native implementati
 - Android: Kotlin
 - iOS: Swift
 - Shared: behavior contract, fixtures, evidence shape, and comparison
-- Reference only: `ed3c/kotlin-auto-webview@d87693c05bd00e0092e7e50ebd31f38dfc486874`
+- KMP reference: `ed3c/kotlin-auto-webview#156@bcb79473eaa6bb2e09f287462aa932a7fdab4957` (exact, unmerged, read-only)
 
 The first vertical slice solves a real authority problem: an Agent may propose navigation, but
 only an exact human approval may dispatch it, and a platform callback is not accepted as proof
@@ -47,11 +47,13 @@ material, not verified repository truth.
 
 The immediate order is:
 
-1. [#3: bind plan approval to exact content](https://github.com/ed3c/agent-native-parity-lab/issues/3);
-2. [#4: add one runnable RN, Compose, and SwiftUI checkpoint](https://github.com/ed3c/agent-native-parity-lab/issues/4).
+1. [#4: pin and replay the exact KMP reference](https://github.com/ed3c/agent-native-parity-lab/issues/4);
+2. [#3: bind the migration-plan approval to exact content](https://github.com/ed3c/agent-native-parity-lab/issues/3);
+3. keep independent Compose/SwiftUI migration unfiled until both gates pass.
 
-Later Tardis-, Helix-, and performance-shaped work remains unfiled until the first real screen
-provides a physical subject and an observed failure.
+React Native is not introduced without a real reference subject. Later native migration, Tardis-,
+Helix-, and performance-shaped work remains unfiled until the KMP replay and first migrated screen
+provide physical evidence.
 
 ## Run
 

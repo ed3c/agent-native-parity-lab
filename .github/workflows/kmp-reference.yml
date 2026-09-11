@@ -1,0 +1,58 @@
+name: kmp-reference
+
+on:
+  pull_request:
+    paths:
+      - "contracts/kmp-reference.v1.json"
+      - "harness/kmp-reference.mjs"
+      - "harness/kmp-reference.test.mjs"
+      - "harness/validate-kmp-reference.mjs"
+      - ".github/workflows/kmp-reference.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out parity lab
+        uses: actions/checkout@v4
+        with:
+          path: lab
+          persist-credentials: false
+      - name: Check out exact KMP reference
+        uses: actions/checkout@v4
+        with:
+          repository: ed3c/kotlin-auto-webview
+          ref: bcb79473eaa6bb2e09f287462aa932a7fdab4957
+          path: kmp-reference
+          persist-credentials: false
+      - name: Validate exact KMP identity before toolchain setup
+        run: node lab/harness/validate-kmp-reference.mjs lab/contracts/kmp-reference.v1.json kmp-reference
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: "8.11.1"
+      - name: Install pinned Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+      - name: Replay existing Play-safe unit tests
+        working-directory: kmp-reference
+        run: scripts/ci/run-gradle-with-annotations.sh :composeApp:testPlaySafeDebugUnitTest
+      - name: Emit bounded reference receipt
+        env:
+          LAB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p lab/evidence
+          node lab/harness/validate-kmp-reference.mjs \
+            lab/contracts/kmp-reference.v1.json \
+            kmp-reference \
+            lab/evidence/kmp-reference.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kmp-reference-receipt
+          path: lab/evidence/kmp-reference.json
