@@ -26,10 +26,12 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.14.3"
-      - run: gradle :android-domain:test --no-daemon
+          gradle-version: "8.11.1"
+      - run: gradle :android-domain:test :android-app:testDebugUnitTest --no-daemon
       - run: mkdir -p evidence && gradle -q :android-domain:run --no-daemon > evidence/android.json
       - uses: actions/upload-artifact@v4
         with:
@@ -41,6 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: swift test --package-path ios-domain
+      - run: swift test --package-path ios-app
       - run: mkdir -p evidence && swift run --package-path ios-domain EmitEvidence > evidence/ios.json
       - uses: actions/upload-artifact@v4
         with:

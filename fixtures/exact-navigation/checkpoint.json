@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "checkpoint_id": "exact-navigation",
+  "operation_id": "nav-001",
+  "initial_page_id": "page-a",
+  "target_page_id": "page-b",
+  "mismatched_page_id": "page-c",
+  "initial_generation": 1,
+  "stale_generation": 2
+}

@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "checkpoint_id": "exact-navigation",
+  "approved_plan_sha256": "9ff2a685df39e700406848683f1133a8bae1ada69ef2dfdbe5ef1e61979ed086",
+  "reference": {
+    "kind": "STATIC_KMP_CONTRACT",
+    "commit": "bcb79473eaa6bb2e09f287462aa932a7fdab4957",
+    "tree": "9fe624d903c429940cd8de0bd05bdf66fd63e4a1"
+  },
+  "implementations": [
+    "ANDROID_KOTLIN_COMPOSE",
+    "IOS_SWIFT_SWIFTUI"
+  ],
+  "shared_implementation": false,
+  "fixture": "fixtures/exact-navigation/checkpoint.json",
+  "accessibility": {
+    "root": "exact-navigation-root",
+    "state": "exact-navigation-state",
+    "approve": "exact-navigation-approve"
+  },
+  "required_controls": [
+    "DISPATCH_WITHOUT_APPROVAL",
+    "DUPLICATE_OPERATION_DISPATCH",
+    "STALE_PAGE_GENERATION",
+    "CALLBACK_WITH_MISMATCHED_POSTCONDITION"
+  ],
+  "duplicate_failure_fingerprint": "CHECKPOINT_DUPLICATE_DISPATCH",
+  "effect_port": "IN_MEMORY_RECORDING",
+  "evidence_ceiling": "NATIVE_CONTRACT_PARITY",
+  "claims_not_made": [
+    "WEBVIEW_RUNTIME",
+    "WKWEBVIEW_RUNTIME",
+    "SIMULATOR",
+    "EMULATOR",
+    "PHYSICAL_DEVICE",
+    "KMP_RUNTIME_PARITY",
+    "MERGED",
+    "RELEASED",
+    "PRODUCTION"
+  ]
+}
