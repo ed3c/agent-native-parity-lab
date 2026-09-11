@@ -50,13 +50,30 @@ final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
         #endif
     }
 
+    /// Guest `/tmp` is not visible to `simctl spawn cat` (SIMULATOR_ENVELOPE_FILE_MISSING_AFTER_XCTEST).
+    /// CI scrapes compact JSON / base64 markers from the xcodebuild log instead.
     private func emitMarked(_ label: String, _ payload: String) {
-        // XCTest on Simulator does not share /tmp with simctl spawn reliably for SPM
-        // library tests; CI scrapes these markers from the xcodebuild log.
-        print("<<<\(label)_BEGIN>>>")
-        print(payload)
-        print("<<<\(label)_END>>>")
+        let begin = "<<<\(label)_BEGIN>>>"
+        let end = "<<<\(label)_END>>>"
+        let b64 = Data(payload.utf8).base64EncodedString()
+        let block = """
+        \(begin)
+        \(payload)
+        \(end)
+        <<<\(label)_B64>>>\(b64)<<<\(label)_B64_END>>>
+        """
+        print(block)
+        if let data = Data((block + "\n").utf8) {
+            FileHandle.standardOutput.write(data)
+            FileHandle.standardError.write(data)
+        }
         fflush(stdout)
+        fflush(stderr)
+        NSLog("%@", "<<<\(label)_B64>>>\(b64)<<<\(label)_B64_END>>>")
+        let attachment = XCTAttachment(string: payload)
+        attachment.name = label
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 
     func testSimulatorEmitsAcceptedRuntimeEnvelope() throws {
@@ -66,11 +83,10 @@ final class ExactNavigationSimulatorRuntimeEnvelopeTests: XCTestCase {
         XCTAssertTrue(json.contains("\"runtime_class\":\"SIMULATOR\""))
         XCTAssertTrue(json.contains("\"result\":\"ACCEPTED\""))
         emitMarked("IOS_SIM_ENVELOPE", json)
-        try? json.write(
-            toFile: NSTemporaryDirectory() + "ios-native-simulator-envelope.json",
-            atomically: true,
-            encoding: .utf8
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "ios-native-simulator-envelope.json"
         )
+        try? json.write(to: tmp, atomically: true, encoding: .utf8)
     }
 
     func testSimulatorControlEnvelopes() throws {

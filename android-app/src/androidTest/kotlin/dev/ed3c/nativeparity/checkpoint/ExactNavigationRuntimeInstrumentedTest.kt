@@ -43,12 +43,15 @@ class ExactNavigationRuntimeInstrumentedTest {
         assertEquals(1, Regex(""""effect_count":1""").findAll(json).count())
 
         // Log markers for CI scrape fallback (instrumentation stdout/logcat).
+        val b64 = android.util.Base64.encodeToString(json.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
         Log.i(TAG, "<<<ANDROID_EMU_ENVELOPE_BEGIN>>>")
         Log.i(TAG, json)
         Log.i(TAG, "<<<ANDROID_EMU_ENVELOPE_END>>>")
+        Log.i(TAG, "<<<ANDROID_EMU_ENVELOPE_B64>>>$b64<<<ANDROID_EMU_ENVELOPE_B64_END>>>")
         println("<<<ANDROID_EMU_ENVELOPE_BEGIN>>>")
         println(json)
         println("<<<ANDROID_EMU_ENVELOPE_END>>>")
+        println("<<<ANDROID_EMU_ENVELOPE_B64>>>$b64<<<ANDROID_EMU_ENVELOPE_B64_END>>>")
 
         // Primary pull path: world-readable emulator tmp (no run-as required).
         runCatching { File("/data/local/tmp/android-native-runtime-envelope.json").writeText(json) }
